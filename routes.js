@@ -20,7 +20,6 @@ router.post('/ingest', (req, res) => {
 
   const ingestionId = uuidv4();
 
-  // Create batches of max 3 ids, with priority and timestamp
   const batches = [];
   for (let i = 0; i < ids.length; i += 3) {
     const batchIds = ids.slice(i, i + 3);
@@ -34,7 +33,6 @@ router.post('/ingest', (req, res) => {
 
   createIngestion(ingestionId, batches);
 
-  // Enqueue batches for async processing
   batches.forEach(batch => {
     enqueueRequest({
       ingestionId,

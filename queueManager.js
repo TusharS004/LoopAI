@@ -14,7 +14,6 @@ export function enqueueRequest(batch) {
 
 function sortQueue() {
   batchQueue.sort((a, b) => {
-    // Sort by priority DESC, then createdAt ASC
     if (PRIORITY_LEVELS[b.priority] !== PRIORITY_LEVELS[a.priority]) {
       return PRIORITY_LEVELS[b.priority] - PRIORITY_LEVELS[a.priority];
     }
@@ -30,7 +29,6 @@ async function processNext() {
   const elapsed = now - lastProcessedTime;
 
   if (elapsed < 5000) {
-    // Wait remaining time before processing next batch
     setTimeout(processNext, 5000 - elapsed);
     return;
   }
@@ -40,14 +38,11 @@ async function processNext() {
 
   const batch = batchQueue.shift();
 
-  // Mark batch as triggered
   updateBatchStatus(batch.ingestionId, batch.batchId, 'triggered');
 
   try {
-    // Simulate external API call delay
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // After processing complete
     updateBatchStatus(batch.ingestionId, batch.batchId, 'completed');
   } catch (error) {
     updateBatchStatus(batch.ingestionId, batch.batchId, 'failed');

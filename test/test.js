@@ -1,6 +1,6 @@
 import { jest, describe, test, expect } from '@jest/globals';
 import request from 'supertest';
-import app from '../index.js'; // adjust path as needed
+import app from '../index.js'; 
 
 describe('Data Ingestion API', () => {
   jest.setTimeout(30000);
