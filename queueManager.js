@@ -1,59 +1,58 @@
-import { v4 as uuidv4 } from 'uuid';
-import { createIngestion, updateBatchStatus, getIngestionStatus } from './ingestionStore.js';
-import { batchIds } from './utils.js';
+import { updateBatchStatus } from './ingestionStore.js';
 
-const jobQueue = [];
-const PRIORITY_ORDER = { HIGH: 1, MEDIUM: 2, LOW: 3 };
+const PRIORITY_LEVELS = { HIGH: 3, MEDIUM: 2, LOW: 1 };
 
-export async function enqueueRequest(ids, priority) {
-    const ingestionId = uuidv4();
-    const batches = batchIds(ids);
+let batchQueue = [];
+let isProcessing = false;
+let lastProcessedTime = 0;
 
-    createIngestion(ingestionId, batches);
+export function enqueueRequest(batch) {
+  batchQueue.push(batch);
+  sortQueue();
+  processNext();
+}
 
-    const timestamp = Date.now();
-
-    for (const batch of batches) {
-        jobQueue.push({
-            priority,
-            timestamp,
-            ingestionId,
-            batch
-        });
+function sortQueue() {
+  batchQueue.sort((a, b) => {
+    // Sort by priority DESC, then createdAt ASC
+    if (PRIORITY_LEVELS[b.priority] !== PRIORITY_LEVELS[a.priority]) {
+      return PRIORITY_LEVELS[b.priority] - PRIORITY_LEVELS[a.priority];
     }
-
-    return ingestionId;
+    return a.createdAt - b.createdAt;
+  });
 }
 
-export function getStatus(ingestionId) {
-    return getIngestionStatus(ingestionId);
-}
+async function processNext() {
+  if (isProcessing) return;
+  if (batchQueue.length === 0) return;
 
-export function sortQueue() {
-    jobQueue.sort((a, b) => {
-        if (PRIORITY_ORDER[a.priority] !== PRIORITY_ORDER[b.priority]) {
-            return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
-        }
-        return a.timestamp - b.timestamp;
-    });
-}
+  const now = Date.now();
+  const elapsed = now - lastProcessedTime;
 
-export function startWorker() {
-    setInterval(async () => {
-        if (jobQueue.length === 0) return;
+  if (elapsed < 5000) {
+    // Wait remaining time before processing next batch
+    setTimeout(processNext, 5000 - elapsed);
+    return;
+  }
 
-        sortQueue();
+  isProcessing = true;
+  lastProcessedTime = Date.now();
 
-        const jobs = jobQueue.splice(0, 1);
-        const { ingestionId, batch } = jobs[0];
+  const batch = batchQueue.shift();
 
-        updateBatchStatus(ingestionId, batch.batch_id, 'triggered');
+  // Mark batch as triggered
+  updateBatchStatus(batch.ingestionId, batch.batchId, 'triggered');
 
-        console.log(`Processing batch ${batch.batch_id} with ids:`, batch.ids);
-        await new Promise(res => setTimeout(res, 2000)); // Simulate delay
-        console.log(`Completed batch ${batch.batch_id}`);
+  try {
+    // Simulate external API call delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-        updateBatchStatus(ingestionId, batch.batch_id, 'completed');
+    // After processing complete
+    updateBatchStatus(batch.ingestionId, batch.batchId, 'completed');
+  } catch (error) {
+    updateBatchStatus(batch.ingestionId, batch.batchId, 'failed');
+  }
 
-    }, 5000);
+  isProcessing = false;
+  processNext();
 }
